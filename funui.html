@@ -1,0 +1,178 @@
+<canvas height="0"></canvas><br><br>
+<input type="file" accept="image/*">
+<button id="download" style="display: none;">download</button>
+<script defer>
+	$=x=>document.querySelector(x);
+	y = $('canvas');
+	_ = y.getContext('2d');
+	sped = 30;
+	len = 200;
+	$('input').onchange = function(event){
+		$('#download').style.display = 'none';
+		x = new Image();
+		x.src = URL.createObjectURL(this.files[0]);
+		x.onload = () => {
+			//len = 1;
+			y.width = x.width;
+			y.height = x.height;
+			bab = x.width/len;
+			z = [];
+			a = 0;
+			b = [{low:0,high:len-1,state:0}];
+			sat = 0;
+			for(var i = 0; i < len; i++){
+				var index = Math.floor(Math.random()*i);
+				z = [...z.slice(0, index), i, ...z.slice(index)];
+			}
+
+			audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+			oscillator  = audioCtx.createOscillator();
+			oscillator.type  = "sawtooth";
+
+			gainNode = audioCtx.createGain();
+			gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+			gainNode.connect(audioCtx.destination);
+
+			videoChunks = [];
+			videoStream = y.captureStream(30);
+			audioStreamDest = audioCtx.createMediaStreamDestination();
+			gainNode.connect(audioStreamDest);
+			audioStream = audioStreamDest.stream;
+
+			combinedStream = new MediaStream([...videoStream.getTracks(), 
+																				...audioStream.getTracks()]);
+			mediaRecorder = new MediaRecorder(combinedStream);
+			mediaRecorder.ondataavailable = e => videoChunks.push(e.data);
+
+			oscillator.connect(gainNode);
+
+			int = setInterval(goob, sped);
+			goob();
+			oscillator.start();
+			mediaRecorder.start();
+		}
+	};
+	goob=()=>{
+		_.clearRect(0, 0, y.width, y.height);
+		for(var i = 0; i < len; i++){
+			_.drawImage(
+				x,
+				bab*z[i], 0, bab+1, x.height - 30,
+				bab*  i , 30, bab+1, y.height - 30
+			)
+		}
+
+		sound(a[1]);
+		if(!sat){
+			if(!next()){
+				sat = 1;
+			}else{
+				_.fillStyle = '#00f8';
+				_.fillRect(bab*a[0], 30, bab+1, y.height - 30);
+
+				_.fillStyle = '#f00';
+				_.fillRect(bab*a[1], 30, bab+1, y.height - 30);
+			}
+		}else{
+			if(sat < len)
+				sound(sat);
+			else
+				oscillator.stop();
+
+			_.fillStyle = '#0a08';
+			_.fillRect(0, 30, bab * (sat - 1), y.height - 30);
+		}
+
+		_.save();
+		/**/_.beginPath();
+		/**/_.rect(0, 0, y.width, 30);
+		/**/_.fillStyle = 'black';
+		/**/_.fill();
+		/**/_.clip();
+		_.fillStyle = "white";
+		_.font = "20px monospace";
+		var T = "geodebreaker.github.io/picsorter";
+		var m = _.measureText(T).width;
+		_.fillText(T, y.width - m - 5, 20);
+		_.font = "12px monospace";
+		var T1 = "algo:quicksort-stack";
+		var T2 = "input:scramble-200";
+		m += Math.max(
+			_.measureText(T1).width,
+			_.measureText(T2).width,
+		);
+		if(m < y.height - 20){
+			_.fillText(T1, 5, 12);
+			_.fillText(T2, 5, 24);
+		}
+		_.restore();
+
+
+		if(sat && sat++ > len + 20){
+			$('#download').style.display = 'inline-block';
+			clearInterval(int);
+			mediaRecorder.stop();
+			mediaRecorder.onstop = () => {
+				var blob = new Blob(videoChunks, { type: 'video/webm' });
+				var url = URL.createObjectURL(blob);
+				DL = document.createElement('a');
+				DL.href = url;
+				DL.download = 'goober-'+
+					Math.floor(Math.random()*1000)
+					+'.webm';
+			};
+		}
+	}
+
+	function loop(abc){
+		if(abc.state == 0){
+			abc.pivot = z[abc.high];
+			abc.I = abc.low - 1;
+
+			abc.J = abc.low;
+
+			abc.state = 1;
+		}
+
+		if(z[abc.J] < abc.pivot){
+			abc.I++;
+			[z[abc.I], z[abc.J]] = [z[abc.J], z[abc.I]];
+		}
+
+		if(++abc.J >= abc.high){
+			[z[abc.I + 1], z[abc.high]] = [z[abc.high], z[abc.I + 1]];
+			pi = abc.I + 1;
+			if(abc.low < pi - 1)
+				b.push({low: abc.low, high:  pi - 1, state: 0});
+			if(pi + 1 < abc.high)
+				b.push({low: pi + 1, high: abc.high, state: 0});
+			return abc.state = -1;
+		};
+	}
+
+	function next(){
+		var abc = b.pop();
+		if(!abc)
+			return false;
+
+		if(abc.state >= 0)
+			loop(abc);
+
+		a = [abc.I, abc.J];
+
+		if(abc.state != -1)
+			b.push(abc);
+
+		return true;
+	}
+
+	function sound(f){
+		oscillator.frequency.setValueAtTime(
+			(150 + 450 / len * z[f]) || 0, audioCtx.currentTime); // value in hertz
+	}
+
+
+	$('#download').onclick = () => {
+		DL.click();
+	}
+</script>
